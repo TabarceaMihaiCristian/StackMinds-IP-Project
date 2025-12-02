@@ -1,0 +1,1 @@
+Aplicatie pentru managerierea evenimentelor

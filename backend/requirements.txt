@@ -1,0 +1,36 @@
+#FasAPI web framework
+
+fastapi
+
+#ASGI server
+uvicorn 
+
+#Database libraries
+sqlalchemy 
+psycopg2-binary 
+
+#Environment variables
+python-dotenv
+
+#Password hashing
+bcrypt
+passlib[bcrypt]
+
+#JWT authentication
+PyJWT
+python-jose 
+
+#Validation & settings
+pydantic
+pydantic-settings
+
+#Migrations
+alembic
+
+#Testing libraries
+pytest
+pytest-asyncio
+
+#Other utilities
+uuid
+
