@@ -1,16 +1,19 @@
-from pydantic import BaseSettings, Field
-from .settings import DatabaseSettings
+from typing import Optional
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from .settings.database_settings import DatabaseSettings
 
 class Settings(BaseSettings):
-    app_env: str = Field("dev", env='APP_ENV')
-    jwt_secret_key: str = Field(..., env='JWT_SECRET_KEY')
-    jwt_algorithm: str = Field("HS256", env='JWT_ALGORITHM')
-    access_token_expire_minutes: int = Field(60, env='ACCESS_TOKEN_EXPIRE_MINUTES')
+    APP_ENV: str = "APP_ENV"
+    JWT_SECRET_KEY: str = 'JWT_SECRET_KEY'
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
-    database: DatabaseSettings = DatabaseSettings()
+    DATABASE: DatabaseSettings = DatabaseSettings()
 
-    class Config:
-        env_file = '.env'
-        env_file_encoding = 'utf-8'
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore", 
+    )
 
-settings = Settings()
+settings = Settings() #type: ignore
