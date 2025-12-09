@@ -32,6 +32,13 @@ from .category import (
     delete_category,
 )
 
+from .dashboard import (
+    get_upcoming_events,
+    get_student_dashboard_data,
+    get_organizer_dashboard_data,
+    get_admin_dashboard_data,
+)
+
 __all__ = [
     "get_event",
     "get_events",
@@ -58,4 +65,9 @@ __all__ = [
     "create_category",
     "update_category",
     "delete_category",
+
+    "get_upcoming_events",
+    "get_student_dashboard_data",
+    "get_organizer_dashboard_data",
+    "get_admin_dashboard_data",
 ]
