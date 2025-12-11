@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.db.session import SessionLocal
 from app.db.base import Base
+from app.db.session import SessionLocal
+from app.api.v1.routes_handler import api_router
 
 def get_db():
     db = SessionLocal()
@@ -12,7 +13,7 @@ def get_db():
         db.close()
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="USV envent manager")
+    app = FastAPI(title="College Events Management API", version="1.0.0")
 
     app.add_middleware(
         CORSMiddleware,
@@ -22,9 +23,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # TODO: include routers here
-    # from app.api.v1.routes_handler import api_router
-    # app.include_router(api_router, prefix="/api/v1")
+    app.include_router(api_router, prefix="/api/v1")
 
     return app
 

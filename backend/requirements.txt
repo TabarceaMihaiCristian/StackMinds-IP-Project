@@ -15,6 +15,7 @@ python-dotenv
 #Password hashing
 bcrypt
 passlib[bcrypt]
+python-jose[cryptography]
 
 #JWT authentication
 PyJWT
@@ -23,6 +24,7 @@ python-jose
 #Validation & settings
 pydantic
 pydantic-settings
+pydantic[email]
 
 #Migrations
 alembic

@@ -4,6 +4,7 @@ from .event import EventBase, EventCreate, EventUpdate, EventRead
 from .location import LocationBase, LocationCreate, LocationUpdate, LocationRead
 from .category import CategoryBase, CategoryCreate, CategoryUpdate, CategoryRead
 from .registration import RegistrationBase, RegistrationCreate, RegistrationRead
+from .dashboard import (DashboardEventSummary, StudentDashboard, OrganizerDashboard, AdminDashboard)
 
 __all__ = [
     "UserBase",
@@ -28,4 +29,8 @@ __all__ = [
     "RegistrationBase",
     "RegistrationCreate",
     "RegistrationRead",
+    "DashboardEventSummary",
+    "StudentDashboard",
+    "OrganizerDashboard",
+    "AdminDashboard"
 ]

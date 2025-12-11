@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class CategoryBase(BaseModel):
     name: str
@@ -15,5 +15,4 @@ class CategoryUpdate(BaseModel):
 class CategoryRead(BaseModel):
     id: str
     
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
