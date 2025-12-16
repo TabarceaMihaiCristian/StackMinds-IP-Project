@@ -3,18 +3,18 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.v1.dependencies import get_db, get_current_active_user, reqire_role
+from app.api.v1.dependencies import get_db, get_current_active_user, require_role
 
 from app.models import User, Event
 
 from app.repositories import (
     get_event,
-    get_registration,
     get_registrations_for_user_and_event,
     count_event_registrations,
     create_registration,
     cancel_registration,
     get_registrations_for_user,
+    get_registrations_for_event,
 )
 
 from app.schemas import RegistrationRead
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/registrations", tags=["registrations"])
 
 @router.post("/events/{event_id}/register", response_model=RegistrationRead, status_code=status.HTTP_201_CREATED)
 
-def register_for_event(event_id: str, db: Session = Depends(get_db), current_user: User = Depends(reqire_role("student", "admin", "organizer"))):
+def register_for_event(event_id: str, db: Session = Depends(get_db), current_user: User = Depends(require_role("student", "admin", "organizer"))):
     event = get_event(db, event_id)
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
@@ -63,7 +63,7 @@ def list_my_registrations(db: Session = Depends(get_db), current_user: User = De
     return registrations
 
 @router.get("/events/{event_id}/registrations", response_model=List[RegistrationRead], status_code=status.HTTP_200_OK)
-def list_registrations_for_event(event_id: str, db: Session = Depends(get_db), current_user: User = Depends(reqire_role("organizer", "admin"))):
+def list_registrations_for_event(event_id: str, db: Session = Depends(get_db), current_user: User = Depends(require_role("organizer", "admin"))):
     event = get_event(db, event_id)
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
@@ -74,5 +74,5 @@ def list_registrations_for_event(event_id: str, db: Session = Depends(get_db), c
             detail="Not allowed to view registrations for this event",
         )
 
-    registrations = get_registrations_for_user(db, event_id)
+    registrations = get_registrations_for_event(db, event_id)
     return registrations

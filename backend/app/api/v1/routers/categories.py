@@ -3,7 +3,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
-from app.api.v1.dependencies import get_db, get_current_active_user, reqire_role
+from app.api.v1.dependencies import get_db, get_current_active_user, require_role
 from app.models import User
 from app.repositories import (
     get_categories,
@@ -34,7 +34,7 @@ def create_new_category(category_in: CategoryCreate, db: Session = Depends(get_d
     return category
 
 @router.put("/{category_id}", response_model=CategoryRead, status_code=status.HTTP_200_OK)
-def update_existing_category(category_id: str, category_in: CategoryUpdate, db: Session = Depends(get_db), current_user: User = Depends(reqire_role("admin"))):
+def update_existing_category(category_id: str, category_in: CategoryUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     category = get_category(db, category_id)
     if not category:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
@@ -42,7 +42,7 @@ def update_existing_category(category_id: str, category_in: CategoryUpdate, db: 
     return category
 
 @router.delete("/{category_id}", response_model=CategoryRead, status_code=status.HTTP_200_OK)
-def delete_existing_category(category_id: str, db: Session = Depends(get_db), current_user: User = Depends(reqire_role("admin"))):
+def delete_existing_category(category_id: str, db: Session = Depends(get_db), current_user: User = Depends(require_role("admin"))):
     category = get_category(db, category_id)
     if not category:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")

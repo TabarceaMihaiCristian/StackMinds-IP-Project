@@ -1,0 +1,15 @@
+{
+  "sqltools.connections": [
+    {
+      "name": "Postgres - local",
+      "driver": "PostgreSQL",
+      "previewLimit": 50,
+      "server": "localhost",
+      "port": 5432,
+      "database": "college_events",
+      "username": "user",
+      "password": "password"
+    }
+  ],
+"sqltools.useNodeRuntime": true
+}

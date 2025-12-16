@@ -15,7 +15,7 @@ class Event(Base):
     end_at = Column(DateTime, nullable=False)
 
     location_id = Column(String(36), ForeignKey("locations.id"), nullable=False)
-    category_id = Column(String(36), ForeignKey("event_categories.id"), nullable=False)
+    category_id = Column(String(36), ForeignKey("categories.id"), nullable=False)
     organizer_id = Column(String(36), ForeignKey("users.id"), nullable=False)   
 
     status = Column(String(50), nullable=False, default="draft")
