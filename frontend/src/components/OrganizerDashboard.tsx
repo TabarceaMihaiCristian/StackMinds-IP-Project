@@ -1,15 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  Calendar,
-  Users,
-  LogOut,
-  Bell,
-  User,
-  Plus,
-  Edit,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Calendar, Users, LogOut, User, Plus, Edit, Trash2, X } from "lucide-react";
 import { apiFetch } from "../api/client";
 
 interface OrganizerDashboardProps {
@@ -19,22 +9,36 @@ interface OrganizerDashboardProps {
 interface Event {
   id: string;
   name: string;
-  date: string; // formatted date, e.g. "15 decembrie 2025"
+
+  // for display
+  displayDate: string; // "18 decembrie 2025"
+
+  // for edits
+  date: string;        // "YYYY-MM-DD"
+  startTime: string;   // "HH:mm"
+  endTime: string;     // "HH:mm"
+
   participants: number;
   location: string;
   description: string;
+
+  category?: string | null;
+  max_participants?: number | null;
 }
 
-// Matches what /dashboard/organizer likely returns for each upcoming event
+// Matches what /dashboard/organizer returns for each upcoming event
 interface DashboardEventSummary {
   id: string;
   title: string;
+  description?: string | null;
   start_at: string;
   end_at: string;
   location_name?: string | null;
   category_name?: string | null;
+  location?: string | null;
+  category?: string | null;
   registrations_count?: number;
-  description?: string | null;
+  max_participants?: number | null;
 }
 
 interface OrganizerDashboardResponse {
@@ -44,31 +48,96 @@ interface OrganizerDashboardResponse {
   upcoming_events: DashboardEventSummary[];
 }
 
+interface CreateEventForm {
+  name: string;
+  date: string;        // YYYY-MM-DD
+  startTime: string;   // HH:mm
+  endTime: string;     // HH:mm
+  location: string;
+  category: string;
+  maxParticipants: string;
+  description: string;
+}
+
+interface EditEventForm {
+  name: string;
+  date: string;        // YYYY-MM-DD
+  startTime: string;   // HH:mm
+  endTime: string;     // HH:mm
+  location: string;
+  description: string;
+}
+
+interface CurrentUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- small helpers for local date/time formatting ---
+
+const toDateInputValue = (d: Date) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const toTimeInputValue = (d: Date) => {
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+};
+
+// build a *local* datetime string without timezone.
+// this avoids the 2-hour shift caused by toISOString().
+const buildLocalDateTime = (dateStr: string, timeStr: string) =>
+  `${dateStr}T${timeStr}:00`;
+
 export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
-  const [activeTab, setActiveTab] = useState<"evenimente" | "participanti">(
-    "evenimente",
-  );
+  const [activeTab, setActiveTab] = useState<"evenimente" | "participanti">("evenimente");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [originalEvent, setOriginalEvent] = useState<Event | null>(null); // for diff on save
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   const [events, setEvents] = useState<Event[]>([]);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
 
-  const currentUser = {
-    name: "Maria Ionescu",
-    role: "Organizator",
-  };
+  const [createForm, setCreateForm] = useState<CreateEventForm>({
+    name: "",
+    date: "",
+    startTime: "",
+    endTime: "",
+    location: "",
+    category: "",
+    maxParticipants: "",
+    description: "",
+  });
 
-  // ---- Load organizer dashboard from backend ----
+  const [editForm, setEditForm] = useState<EditEventForm | null>(null);
+
+  const [createSaving, setCreateSaving] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [deleteSaving, setDeleteSaving] = useState(false);
+
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+
+  // ---- Helpers ----
 
   const mapDashboardEventToEvent = (e: DashboardEventSummary): Event => {
-    const startDate = new Date(e.start_at);
-    const formattedDate = startDate.toLocaleDateString("ro-RO", {
+    const start = new Date(e.start_at);
+    const end = new Date(e.end_at);
+
+    const displayDate = start.toLocaleDateString("ro-RO", {
       day: "numeric",
       month: "long",
       year: "numeric",
@@ -77,41 +146,63 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
     return {
       id: e.id,
       name: e.title,
-      date: formattedDate,
+      displayDate,
+      date: toDateInputValue(start),
+      startTime: toTimeInputValue(start),
+      endTime: toTimeInputValue(end),
       participants: e.registrations_count ?? 0,
-      location: e.location_name ?? "Nespecificat",
+      location: e.location_name ?? e.location ?? "Nespecificat",
       description: e.description ?? "",
+      category: e.category_name ?? e.category ?? null,
+      max_participants: e.max_participants ?? null,
     };
   };
 
+  const loadDashboard = async () => {
+    try {
+      setLoadingDashboard(true);
+      setDashboardError(null);
+
+      const data = await apiFetch<OrganizerDashboardResponse>("/dashboard/organizer");
+      const mappedEvents = data.upcoming_events.map(mapDashboardEventToEvent);
+      setEvents(mappedEvents);
+    } catch (err: any) {
+      console.error(err);
+      setDashboardError(
+        err?.message || "Nu s-au putut încărca evenimentele organizatorului",
+      );
+    } finally {
+      setLoadingDashboard(false);
+    }
+  };
+
+  const loadCurrentUser = async () => {
+    try {
+      const user = await apiFetch<CurrentUser>("/auth/me");
+      setCurrentUser(user);
+    } catch (err) {
+      console.error("Nu s-a putut încărca utilizatorul curent", err);
+    }
+  };
+
   useEffect(() => {
-    const loadDashboard = async () => {
-      try {
-        setLoadingDashboard(true);
-        setDashboardError(null);
-
-        const data = await apiFetch<OrganizerDashboardResponse>(
-          "/dashboard/organizer",
-        );
-
-        const mappedEvents = data.upcoming_events.map(mapDashboardEventToEvent);
-        setEvents(mappedEvents);
-      } catch (err: any) {
-        setDashboardError(
-          err?.message || "Nu s-au putut încărca evenimentele organizatorului",
-        );
-      } finally {
-        setLoadingDashboard(false);
-      }
-    };
-
     loadDashboard();
+    loadCurrentUser();
   }, []);
 
-  // ---- Local UI handlers (still operating on local state) ----
+  // ---- UI handlers ----
 
   const handleEditEvent = (event: Event) => {
     setSelectedEvent(event);
+    setOriginalEvent(event);
+    setEditForm({
+      name: event.name,
+      date: event.date,
+      startTime: event.startTime,
+      endTime: event.endTime,
+      location: event.location === "Nespecificat" ? "" : event.location,
+      description: event.description ?? "",
+    });
     setShowEditModal(true);
   };
 
@@ -120,31 +211,179 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
     setShowDeleteConfirm(true);
   };
 
-  const confirmDelete = () => {
-    if (selectedEvent) {
-      // TODO: Call DELETE /events/{id} on backend before updating UI
-      setEvents((prev) => prev.filter((e) => e.id !== selectedEvent.id));
-      setShowDeleteConfirm(false);
-      setSelectedEvent(null);
-    }
-  };
-
-  const saveEdit = () => {
-    if (selectedEvent) {
-      // TODO: Call PUT /events/{id} on backend with updated data
-      setEvents((prev) =>
-        prev.map((e) => (e.id === selectedEvent.id ? selectedEvent : e)),
-      );
-      setShowEditModal(false);
-      setSelectedEvent(null);
-    }
-  };
-
   const showParticipants = (event: Event) => {
     setSelectedEvent(event);
     setActiveTab("participanti");
-    // TODO: Optionally fetch real participants:
-    // await apiFetch(`/registrations/events/${event.id}/registrations`);
+    // TODO: GET /registrations/events/{event.id}/registrations
+  };
+
+  // Create event: POST /events
+  const handleCreateEvent = async () => {
+    if (
+      !createForm.name ||
+      !createForm.date ||
+      !createForm.startTime ||
+      !createForm.endTime
+    ) {
+      alert("Te rog completează numele, data, ora de început și ora de sfârșit.");
+      return;
+    }
+
+    let maxParticipantsNumber: number | null = null;
+    if (createForm.maxParticipants.trim() !== "") {
+      const parsed = Number(createForm.maxParticipants);
+      if (!Number.isInteger(parsed) || parsed <= 0) {
+        alert("Numărul maxim de participanți trebuie să fie un număr întreg pozitiv.");
+        return;
+      }
+      maxParticipantsNumber = parsed;
+    }
+
+    const startAtStr = buildLocalDateTime(createForm.date, createForm.startTime);
+    const endAtStr = buildLocalDateTime(createForm.date, createForm.endTime);
+
+    if (new Date(endAtStr) <= new Date(startAtStr)) {
+      alert("Ora de sfârșit trebuie să fie după ora de început.");
+      return;
+    }
+
+    try {
+      setCreateSaving(true);
+
+      await apiFetch("/events", {
+        method: "POST",
+        body: JSON.stringify({
+          title: createForm.name,
+          description: createForm.description || null,
+          start_at: startAtStr,      // <-- no toISOString(), stays local
+          end_at: endAtStr,
+          location: createForm.location || null,
+          category: createForm.category || null,
+          max_participants: maxParticipantsNumber,
+          status: "draft",
+        }),
+      });
+
+      setCreateForm({
+        name: "",
+        date: "",
+        startTime: "",
+        endTime: "",
+        location: "",
+        category: "",
+        maxParticipants: "",
+        description: "",
+      });
+      setShowCreateModal(false);
+
+      await loadDashboard();
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "Eroare la crearea evenimentului.");
+    } finally {
+      setCreateSaving(false);
+    }
+  };
+
+  // Edit event: PUT /events/{id} – only send changed fields
+  const saveEdit = async () => {
+    if (!selectedEvent || !editForm || !originalEvent) return;
+
+    const payload: any = {};
+
+    // title
+    if (editForm.name !== originalEvent.name) {
+      payload.title = editForm.name;
+    }
+
+    // description – only send if changed
+    if (editForm.description !== originalEvent.description) {
+      payload.description =
+        editForm.description.trim() === "" ? null : editForm.description.trim();
+    }
+
+    // date / time
+    const dateChanged =
+      editForm.date !== originalEvent.date ||
+      editForm.startTime !== originalEvent.startTime ||
+      editForm.endTime !== originalEvent.endTime;
+
+    if (dateChanged) {
+      if (!editForm.date || !editForm.startTime || !editForm.endTime) {
+        alert("Data, ora de început și ora de sfârșit trebuie completate.");
+        return;
+      }
+
+      const startAtStr = buildLocalDateTime(editForm.date, editForm.startTime);
+      const endAtStr = buildLocalDateTime(editForm.date, editForm.endTime);
+
+      if (new Date(endAtStr) <= new Date(startAtStr)) {
+        alert("Ora de sfârșit trebuie să fie după ora de început.");
+        return;
+      }
+
+      payload.start_at = startAtStr;
+      payload.end_at = endAtStr;
+    }
+
+    // location
+    if (editForm.location !== originalEvent.location) {
+      payload.location =
+        editForm.location.trim() === "" ? null : editForm.location.trim();
+    }
+
+    // nothing changed → just close modal
+    if (Object.keys(payload).length === 0) {
+      setShowEditModal(false);
+      setSelectedEvent(null);
+      setOriginalEvent(null);
+      setEditForm(null);
+      return;
+    }
+
+    try {
+      setEditSaving(true);
+
+      await apiFetch(`/events/${selectedEvent.id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+
+      setShowEditModal(false);
+      setSelectedEvent(null);
+      setOriginalEvent(null);
+      setEditForm(null);
+
+      await loadDashboard();
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "Eroare la actualizarea evenimentului.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  // Delete event: DELETE /events/{id}
+  const confirmDelete = async () => {
+    if (!selectedEvent) return;
+
+    try {
+      setDeleteSaving(true);
+
+      await apiFetch(`/events/${selectedEvent.id}`, {
+        method: "DELETE",
+      });
+
+      setShowDeleteConfirm(false);
+      setSelectedEvent(null);
+
+      await loadDashboard();
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "Nu s-a putut șterge evenimentul.");
+    } finally {
+      setDeleteSaving(false);
+    }
   };
 
   return (
@@ -152,7 +391,7 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
       {/* Sidebar */}
       <div className="w-64 bg-indigo-700 text-white flex flex-col">
         <div className="px-6 py-4 border-b border-indigo-600">
-          <h1 className="text-lg font-semibold tracking-tight">USV Events</h1>
+          <h1>USV Events</h1>
           <p className="text-indigo-200 text-sm mt-1">Organizer</p>
         </div>
 
@@ -160,9 +399,7 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
           <button
             onClick={() => setActiveTab("evenimente")}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition-colors ${
-              activeTab === "evenimente"
-                ? "bg-indigo-600"
-                : "hover:bg-indigo-600"
+              activeTab === "evenimente" ? "bg-indigo-600" : "hover:bg-indigo-600"
             }`}
           >
             <Calendar className="w-5 h-5" />
@@ -172,9 +409,7 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
           <button
             onClick={() => setActiveTab("participanti")}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition-colors ${
-              activeTab === "participanti"
-                ? "bg-indigo-600"
-                : "hover:bg-indigo-600"
+              activeTab === "participanti" ? "bg-indigo-600" : "hover:bg-indigo-600"
             }`}
           >
             <Users className="w-5 h-5" />
@@ -197,18 +432,15 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
       <div className="flex-1 bg-gray-50">
         {/* Header */}
         <div className="bg-white shadow-sm px-8 py-4 flex items-center justify-between">
-          <h2 className="text-gray-800 text-lg font-semibold">
+          <h2 className="text-gray-800">
             {activeTab === "evenimente" && "Evenimentele mele"}
             {activeTab === "participanti" && "Participanți"}
           </h2>
           <div className="flex items-center gap-4">
-            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-              <Bell className="w-5 h-5 text-gray-600" />
-            </button>
             <div className="relative">
               <button
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                onClick={() => setShowUserDropdown((prev) => !prev)}
+                onClick={() => setShowUserDropdown(!showUserDropdown)}
               >
                 <User className="w-5 h-5 text-gray-600" />
               </button>
@@ -219,7 +451,7 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                       setShowUserDropdown(false);
                       setShowProfileModal(true);
                     }}
-                    className="block px-4 py-3 text-gray-800 hover:bg-gray-100 w-full text-left text-sm"
+                    className="block px-4 py-3 text-gray-800 hover:bg-gray-100 w-full text-left"
                   >
                     Profilul meu
                   </button>
@@ -234,12 +466,10 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
           {activeTab === "evenimente" && (
             <div>
               <div className="flex items-center justify-between mb-6">
-                <p className="text-gray-600 text-sm">
-                  Gestionează evenimentele tale
-                </p>
+                <p className="text-gray-600">Gestionează evenimentele tale</p>
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="flex items-center gap-2 bg-indigo-700 text-white px-6 py-3 rounded-lg hover:bg-indigo-800 transition-colors text-sm font-medium"
+                  className="flex items-center gap-2 bg-indigo-700 text-white px-6 py-3 rounded-lg hover:bg-indigo-800 transition-colors"
                 >
                   <Plus className="w-5 h-5" />
                   Creează eveniment
@@ -266,39 +496,37 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                     </div>
                   ) : (
                     events.map((event) => (
-                      <div
-                        key={event.id}
-                        className="bg-white p-6 rounded-lg shadow-sm"
-                      >
-                        <div className="flex items-start justify-between gap-4">
+                      <div key={event.id} className="bg-white p-6 rounded-lg shadow-sm">
+                        <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <h3 className="text-gray-800 mb-2 font-semibold">
-                              {event.name}
-                            </h3>
-                            <div className="space-y-1 text-sm">
-                              <p className="text-gray-600">📅 {event.date}</p>
-                              <p className="text-gray-600">
-                                📍 {event.location}
+                            <h3 className="text-gray-800 mb-2">{event.name}</h3>
+                            <div className="space-y-1">
+                              <p className="text-gray-600 text-sm">📅 {event.displayDate}</p>
+                              <p className="text-gray-600 text-sm">
+                                ⏰ {event.startTime} – {event.endTime}
                               </p>
+                              <p className="text-gray-600 text-sm">📍 {event.location}</p>
                               <button
                                 onClick={() => showParticipants(event)}
-                                className="text-indigo-700 hover:underline"
+                                className="text-indigo-700 text-sm hover:underline"
                               >
                                 👥 {event.participants} participanți înregistrați
                               </button>
                             </div>
                           </div>
-                          <div className="flex flex-col sm:flex-row gap-2">
+                          <div className="flex gap-2">
                             <button
                               onClick={() => handleEditEvent(event)}
-                              className="flex items-center gap-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition-colors text-sm"
+                              className="flex items-center gap-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition-colors"
+                              disabled={editSaving}
                             >
                               <Edit className="w-4 h-4" />
                               Editează
                             </button>
                             <button
                               onClick={() => handleDeleteEvent(event)}
-                              className="flex items-center gap-2 bg-red-100 text-red-700 px-4 py-2 rounded-lg hover:bg-red-200 transition-colors text-sm"
+                              className="flex items-center gap-2 bg-red-100 text-red-700 px-4 py-2 rounded-lg hover:bg-red-200 transition-colors"
+                              disabled={deleteSaving}
                             >
                               <Trash2 className="w-4 h-4" />
                               Șterge
@@ -318,46 +546,38 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
               {selectedEvent ? (
                 <div>
                   <div className="mb-6">
-                    <h3 className="text-gray-800 mb-2 font-semibold">
-                      {selectedEvent.name}
-                    </h3>
-                    <p className="text-gray-600 text-sm">
+                    <h3 className="text-gray-800 mb-2">{selectedEvent.name}</h3>
+                    <p className="text-gray-600">
                       Total participanți: {selectedEvent.participants}
                     </p>
                   </div>
-
-                  {/* Still using dummy participants list for now */}
+                  {/* încă dummy data până legi /registrations */}
                   <div className="space-y-3">
-                    {Array.from(
-                      { length: selectedEvent.participants || 0 },
-                      (_, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center justify-between py-3 border-b border-gray-100"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                              <User className="w-5 h-5 text-indigo-700" />
-                            </div>
-                            <div>
-                              <p className="text-gray-800 text-sm">
-                                Student {i + 1}
-                              </p>
-                              <p className="text-gray-500 text-xs">
-                                student{i + 1}@usv.ro
-                              </p>
-                            </div>
+                    {Array.from({ length: selectedEvent.participants }, (_, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between py-3 border-b border-gray-100"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                            <User className="w-5 h-5 text-indigo-700" />
                           </div>
-                          <span className="text-green-700 text-xs bg-green-100 px-3 py-1 rounded">
-                            Confirmat
-                          </span>
+                          <div>
+                            <p className="text-gray-800">Student {i + 1}</p>
+                            <p className="text-gray-500 text-sm">
+                              student{i + 1}@usv.ro
+                            </p>
+                          </div>
                         </div>
-                      ),
-                    )}
+                        <span className="text-green-700 text-sm bg-green-100 px-3 py-1 rounded">
+                          Confirmat
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ) : (
-                <p className="text-gray-600 text-center text-sm">
+                <p className="text-gray-600 text-center">
                   Selectează un eveniment pentru a vedea participanții
                 </p>
               )}
@@ -371,7 +591,7 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
             <div className="bg-indigo-700 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
-              <h3 className="font-semibold">Profilul meu</h3>
+              <h3>Profilul meu</h3>
               <button
                 onClick={() => setShowProfileModal(false)}
                 className="p-1 hover:bg-indigo-600 rounded transition-colors"
@@ -385,17 +605,19 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                 <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
                   <User className="w-10 h-10 text-indigo-700" />
                 </div>
-                <h4 className="text-gray-800 text-center font-medium">
-                  {currentUser.name}
+                <h4 className="text-gray-800 text-center">
+                  {currentUser?.name ?? "Utilizator"}
                 </h4>
-                <p className="text-gray-600 text-sm">{currentUser.role}</p>
+                <p className="text-gray-600 text-sm">
+                  {currentUser?.role ?? ""}
+                </p>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Create Event Modal (still local-only; TODO: wire to POST /events) */}
+      {/* Create Event Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full">
@@ -416,7 +638,11 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                 </label>
                 <input
                   type="text"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none text-sm"
+                  value={createForm.name}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({ ...f, name: e.target.value }))
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none"
                   placeholder="Ex: Conferința IT 2025"
                 />
               </div>
@@ -427,8 +653,47 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                 </label>
                 <input
                   type="date"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none text-sm"
+                  value={createForm.date}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({ ...f, date: e.target.value }))
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-600 text-sm mb-2">
+                    Ora început
+                  </label>
+                  <input
+                    type="time"
+                    value={createForm.startTime}
+                    onChange={(e) =>
+                      setCreateForm((f) => ({
+                        ...f,
+                        startTime: e.target.value,
+                      }))
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-600 text-sm mb-2">
+                    Ora sfârșit
+                  </label>
+                  <input
+                    type="time"
+                    value={createForm.endTime}
+                    onChange={(e) =>
+                      setCreateForm((f) => ({
+                        ...f,
+                        endTime: e.target.value,
+                      }))
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none"
+                  />
+                </div>
               </div>
 
               <div>
@@ -437,8 +702,46 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                 </label>
                 <input
                   type="text"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none text-sm"
+                  value={createForm.location}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({ ...f, location: e.target.value }))
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none"
                   placeholder="Ex: Sala A1"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-600 text-sm mb-2">
+                  Categorie
+                </label>
+                <input
+                  type="text"
+                  value={createForm.category}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({ ...f, category: e.target.value }))
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none"
+                  placeholder="Ex: Conferință"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-600 text-sm mb-2">
+                  Nr maxim participanți
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={createForm.maxParticipants}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({
+                      ...f,
+                      maxParticipants: e.target.value,
+                    }))
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none"
+                  placeholder="Ex: 50"
                 />
               </div>
 
@@ -447,7 +750,14 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                   Descriere
                 </label>
                 <textarea
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none text-sm"
+                  value={createForm.description}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({
+                      ...f,
+                      description: e.target.value,
+                    }))
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none"
                   rows={4}
                   placeholder="Descrie evenimentul..."
                 />
@@ -456,18 +766,17 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="flex-1 bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors text-sm"
+                  className="flex-1 bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors"
+                  disabled={createSaving}
                 >
                   Anulează
                 </button>
                 <button
-                  onClick={() => {
-                    // TODO: Call POST /events here with form data, then reload dashboard
-                    setShowCreateModal(false);
-                  }}
-                  className="flex-1 bg-indigo-700 text-white px-6 py-3 rounded-lg hover:bg-indigo-800 transition-colors text-sm font-medium"
+                  onClick={handleCreateEvent}
+                  className="flex-1 bg-indigo-700 text-white px-6 py-3 rounded-lg hover:bg-indigo-800 transition-colors disabled:opacity-70"
+                  disabled={createSaving}
                 >
-                  Creează
+                  {createSaving ? "Se creează..." : "Creează"}
                 </button>
               </div>
             </div>
@@ -476,7 +785,7 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
       )}
 
       {/* Edit Event Modal */}
-      {showEditModal && selectedEvent && (
+      {showEditModal && selectedEvent && editForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full">
             <div className="bg-indigo-700 text-white px-6 py-4 flex items-center justify-between rounded-t-lg">
@@ -485,6 +794,8 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedEvent(null);
+                  setOriginalEvent(null);
+                  setEditForm(null);
                 }}
                 className="p-1 hover:bg-indigo-600 rounded transition-colors"
               >
@@ -499,14 +810,11 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                 </label>
                 <input
                   type="text"
-                  value={selectedEvent.name}
+                  value={editForm.name}
                   onChange={(e) =>
-                    setSelectedEvent({
-                      ...selectedEvent,
-                      name: e.target.value,
-                    })
+                    setEditForm((f) => (f ? { ...f, name: e.target.value } : f))
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none"
                 />
               </div>
 
@@ -515,16 +823,46 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                   Data evenimentului
                 </label>
                 <input
-                  type="text"
-                  value={selectedEvent.date}
+                  type="date"
+                  value={editForm.date}
                   onChange={(e) =>
-                    setSelectedEvent({
-                      ...selectedEvent,
-                      date: e.target.value,
-                    })
+                    setEditForm((f) => (f ? { ...f, date: e.target.value } : f))
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-600 text-sm mb-2">
+                    Ora început
+                  </label>
+                  <input
+                    type="time"
+                    value={editForm.startTime}
+                    onChange={(e) =>
+                      setEditForm((f) =>
+                        f ? { ...f, startTime: e.target.value } : f,
+                      )
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-600 text-sm mb-2">
+                    Ora sfârșit
+                  </label>
+                  <input
+                    type="time"
+                    value={editForm.endTime}
+                    onChange={(e) =>
+                      setEditForm((f) =>
+                        f ? { ...f, endTime: e.target.value } : f,
+                      )
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none"
+                  />
+                </div>
               </div>
 
               <div>
@@ -533,14 +871,12 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                 </label>
                 <input
                   type="text"
-                  value={selectedEvent.location}
+                  value={editForm.location}
                   onChange={(e) =>
-                    setSelectedEvent({
-                      ...selectedEvent,
-                      location: e.target.value,
-                    })
+                    setEditForm((f) => (f ? { ...f, location: e.target.value } : f))
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none"
+                  placeholder="Ex: Sala A1"
                 />
               </div>
 
@@ -549,14 +885,13 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                   Descriere
                 </label>
                 <textarea
-                  value={selectedEvent.description}
+                  value={editForm.description}
                   onChange={(e) =>
-                    setSelectedEvent({
-                      ...selectedEvent,
-                      description: e.target.value,
-                    })
+                    setEditForm((f) =>
+                      f ? { ...f, description: e.target.value } : f,
+                    )
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none"
                   rows={4}
                 />
               </div>
@@ -566,16 +901,20 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                   onClick={() => {
                     setShowEditModal(false);
                     setSelectedEvent(null);
+                    setOriginalEvent(null);
+                    setEditForm(null);
                   }}
-                  className="flex-1 bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors text-sm"
+                  className="flex-1 bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors"
+                  disabled={editSaving}
                 >
                   Anulează
                 </button>
                 <button
                   onClick={saveEdit}
-                  className="flex-1 bg-indigo-700 text-white px-6 py-3 rounded-lg hover:bg-indigo-800 transition-colors text-sm font-medium"
+                  className="flex-1 bg-indigo-700 text-white px-6 py-3 rounded-lg hover:bg-indigo-800 transition-colors disabled:opacity-70"
+                  disabled={editSaving}
                 >
-                  Salvează
+                  {editSaving ? "Se salvează..." : "Salvează"}
                 </button>
               </div>
             </div>
@@ -588,12 +927,9 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
             <div className="p-6">
-              <h3 className="text-gray-800 mb-4 font-semibold">
-                Șterge eveniment
-              </h3>
-              <p className="text-gray-600 mb-6 text-sm">
-                Ești sigur că vrei să ștergi evenimentul "
-                <span className="font-medium">{selectedEvent.name}</span>"?
+              <h3 className="text-gray-800 mb-4">Șterge eveniment</h3>
+              <p className="text-gray-600 mb-6">
+                Ești sigur că vrei să ștergi evenimentul "{selectedEvent.name}"?
                 Această acțiune nu poate fi anulată.
               </p>
 
@@ -603,15 +939,17 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                     setShowDeleteConfirm(false);
                     setSelectedEvent(null);
                   }}
-                  className="flex-1 bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors text-sm"
+                  className="flex-1 bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors"
+                  disabled={deleteSaving}
                 >
                   Anulează
                 </button>
                 <button
                   onClick={confirmDelete}
-                  className="flex-1 bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                  className="flex-1 bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-70"
+                  disabled={deleteSaving}
                 >
-                  Șterge
+                  {deleteSaving ? "Se șterge..." : "Șterge"}
                 </button>
               </div>
             </div>

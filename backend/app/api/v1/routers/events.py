@@ -22,8 +22,8 @@ def get_event_by_id(event_id: str, db: Session = Depends(get_db), current_user: 
     return event
 
 @router.post("/", response_model=EventRead, status_code=status.HTTP_201_CREATED)
-def create_new_event(event_in: EventCreate, db: Session = Depends(get_db), current_user: User = Depends(require_role("organizer", "admin"))):
-    event = create_event(db, event_in=event_in, organizer_id=str(current_user.id))
+def create_new_event(event_id: EventCreate, db: Session = Depends(get_db), current_user: User = Depends(require_role("organizer", "admin"))):
+    event = create_event(db, event_id=event_id, organizer_id=str(current_user.id))
     return event
 
 @router.put("/{event_id}", response_model=EventRead)

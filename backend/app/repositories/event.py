@@ -20,16 +20,16 @@ def get_events(db: Session, skip: int = 0, limit: int = 100, upcoming_only: bool
     result = db.execute(query).scalars().all()
     return cast(List[Event], result)
 
-def create_event(db: Session, event_in: EventCreate, organizer_id: str) -> Event:
-    event = Event(title=event_in.title,
-                  description=event_in.description,
-                  start_at=event_in.start_at,
-                  end_at=event_in.end_at,
-                  location_id=event_in.location_id,
-                  category_id=event_in.category_id,
-                  max_participants=event_in.max_participants,
-                  status=event_in.status,
-                  organizer_id=organizer_id
+def create_event(db: Session, event_id: EventCreate, organizer_id: str) -> Event:
+    event = Event(title=event_id.title,
+                description=event_id.description,
+                start_at=event_id.start_at,
+                end_at=event_id.end_at,
+                location=event_id.location,
+                category=event_id.category,
+                max_participants=event_id.max_participants or 0,
+                status=event_id.status,
+                organizer_id=organizer_id
                 )
     db.add(event)
     db.commit()
@@ -38,6 +38,9 @@ def create_event(db: Session, event_in: EventCreate, organizer_id: str) -> Event
 
 def update_event(db: Session, event: Event, event_in: EventUpdate) -> Event:
     for field, value in event_in.model_dump(exclude_unset=True).items():
+        # coerce explicit null for max_participants to 0 to satisfy DB constraint
+        if field == "max_participants" and value is None:
+            value = 0
         setattr(event, field, value)
     db.commit()
     db.refresh(event)

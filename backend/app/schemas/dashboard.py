@@ -5,13 +5,14 @@ from pydantic import BaseModel, ConfigDict
 
 
 class DashboardEventSummary(BaseModel):
-    id: int
+    id: str
     title: str
     start_at: datetime
     end_at: datetime
     status: str
     category_name: Optional[str] = None
     location_name: Optional[str] = None
+    organizer_name: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

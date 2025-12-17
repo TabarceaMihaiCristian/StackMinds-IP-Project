@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import cast
 
-from app.api.v1.dependencies import get_db
+from app.api.v1.dependencies import get_db, get_current_active_user
 from app.core.security import verify_password, create_access_token, hash_password
 from app.models import User
 from app.schemas import Token, LoginRequest, UserCreate, UserRead
@@ -43,3 +43,7 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     return user
+
+@router.get("/me", response_model=UserRead)
+def read_current_user(current_user: User = Depends(get_current_active_user)):
+    return current_user

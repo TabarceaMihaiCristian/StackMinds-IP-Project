@@ -1,8 +1,6 @@
 from .user import UserBase, UserCreate, UserUpdate, UserRead
 from .auth import Token, TokenData, LoginRequest
 from .event import EventBase, EventCreate, EventUpdate, EventRead
-from .location import LocationBase, LocationCreate, LocationUpdate, LocationRead
-from .category import CategoryBase, CategoryCreate, CategoryUpdate, CategoryRead
 from .registration import RegistrationBase, RegistrationCreate, RegistrationRead
 from .dashboard import (DashboardEventSummary, StudentDashboard, OrganizerDashboard, AdminDashboard)
 
@@ -18,14 +16,6 @@ __all__ = [
     "EventCreate",
     "EventUpdate",
     "EventRead",
-    "LocationBase",
-    "LocationCreate",
-    "LocationUpdate",
-    "LocationRead",
-    "CategoryBase",
-    "CategoryCreate",
-    "CategoryUpdate",
-    "CategoryRead",
     "RegistrationBase",
     "RegistrationCreate",
     "RegistrationRead",

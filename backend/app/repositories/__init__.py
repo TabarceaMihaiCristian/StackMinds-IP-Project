@@ -16,21 +16,6 @@ from .registration import (
     get_registrations_for_event,
 )
 
-from .location import (
-    get_location,
-    get_locations,
-    create_location,
-    update_location,
-    delete_location,
-)
-
-from .category import (
-    get_category,
-    get_categories,
-    create_category,
-    update_category,
-    delete_category,
-)
 
 from .dashboard import (
     get_upcoming_events,
@@ -53,18 +38,6 @@ __all__ = [
     "cancel_registration",
     "get_registrations_for_user",
     "get_registrations_for_event",
-
-    "get_location",
-    "get_locations",
-    "create_location",
-    "update_location",
-    "delete_location",
-
-    "get_category",
-    "get_categories",
-    "create_category",
-    "update_category",
-    "delete_category",
 
     "get_upcoming_events",
     "get_student_dashboard_data",

@@ -14,8 +14,9 @@ class Event(Base):
     start_at = Column(DateTime, nullable=False)
     end_at = Column(DateTime, nullable=False)
 
-    location_id = Column(String(36), ForeignKey("locations.id"), nullable=False)
-    category_id = Column(String(36), ForeignKey("categories.id"), nullable=False)
+    location = Column(String(100), nullable=False)
+    category = Column(String(100), nullable=False)
+    
     organizer_id = Column(String(36), ForeignKey("users.id"), nullable=False)   
 
     status = Column(String(50), nullable=False, default="draft")
@@ -24,8 +25,12 @@ class Event(Base):
     created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False) 
     updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc), nullable=False)
 
-    location = relationship("Location")
-    category = relationship("EventCategory")
     organizer = relationship("User", back_populates="organized_events")
     registrations = relationship("Registration", back_populates="event")
-    
+
+    @property
+    def organizer_name(self) -> str | None:
+        if self.organizer:
+            return self.organizer.name
+        return None
+        

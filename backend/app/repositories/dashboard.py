@@ -4,7 +4,7 @@ from typing import Sequence
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, aliased
 
-from app.models import Event, Registration, User, EventCategory, Location
+from app.models import Event, Registration, User
 
 
 def get_upcoming_events(db: Session, limit: int = 5) -> Sequence[Event]:
@@ -39,14 +39,9 @@ def get_student_dashboard_data(db: Session, student_id: str):
     )
     upcoming_count = int(db.execute(upcoming_count_stmt).scalar_one())
 
-    category_alias = aliased(EventCategory)
-    location_alias = aliased(Location)
-
     upcoming_events_stmt = (
-        select(Event, category_alias.name, location_alias.name)
+        select(Event)
         .join(Registration, Registration.event_id == Event.id)
-        .join(category_alias, Event.category_id == category_alias.id, isouter=True)
-        .join(location_alias, Event.location_id == location_alias.id, isouter=True)
         .where(
             Registration.user_id == student_id,
             Registration.status == "registered",
@@ -86,13 +81,9 @@ def get_organizer_dashboard_data(db: Session, organizer_id: str):
     )
     total_regs = int(db.execute(total_regs_stmt).scalar_one())
 
-    category_alias = aliased(EventCategory)
-    location_alias = aliased(Location)
 
     upcoming_events_stmt = (
-        select(Event, category_alias.name, location_alias.name)
-        .join(category_alias, Event.category_id == category_alias.id, isouter=True)
-        .join(location_alias, Event.location_id == location_alias.id, isouter=True)
+        select(Event)
         .where(
             Event.organizer_id == organizer_id,
             Event.start_at >= now,
@@ -123,13 +114,8 @@ def get_admin_dashboard_data(db: Session):
         ).scalar_one()
     )
 
-    category_alias = aliased(EventCategory)
-    location_alias = aliased(Location)
-
     upcoming_events_stmt = (
-        select(Event, category_alias.name, location_alias.name)
-        .join(category_alias, Event.category_id == category_alias.id, isouter=True)
-        .join(location_alias, Event.location_id == location_alias.id, isouter=True)
+        select(Event)
         .where(Event.start_at >= now, Event.status == "published")
         .order_by(Event.start_at.asc())
         .limit(5)
