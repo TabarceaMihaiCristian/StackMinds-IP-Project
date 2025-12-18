@@ -14,6 +14,7 @@ class RegistrationRead(BaseModel):
     id: str
     user_id: str
     event_id: str
+    status: str
     registered_at: datetime
     checkin_at: Optional[datetime] = None
 

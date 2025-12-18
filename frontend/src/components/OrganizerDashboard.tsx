@@ -78,7 +78,16 @@ interface CurrentUser {
   updated_at: string;
 }
 
-// --- small helpers for local date/time formatting ---
+interface EventRegistration {
+  id: string;
+  user_id: string;
+  event_id: string;
+  status: string; // "registered" | "canceled" | ...
+  created_at: string;
+  updated_at: string;
+}
+
+// --- helpers for local date/time formatting ---
 
 const toDateInputValue = (d: Date) => {
   const year = d.getFullYear();
@@ -93,8 +102,7 @@ const toTimeInputValue = (d: Date) => {
   return `${hours}:${minutes}`;
 };
 
-// build a *local* datetime string without timezone.
-// this avoids the 2-hour shift caused by toISOString().
+// build a *local* datetime string without timezone offset issues
 const buildLocalDateTime = (dateStr: string, timeStr: string) =>
   `${dateStr}T${timeStr}:00`;
 
@@ -105,7 +113,7 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const [originalEvent, setOriginalEvent] = useState<Event | null>(null); // for diff on save
+  const [originalEvent, setOriginalEvent] = useState<Event | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   const [events, setEvents] = useState<Event[]>([]);
@@ -130,6 +138,11 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
   const [deleteSaving, setDeleteSaving] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+
+  // participants state for selected event
+  const [participants, setParticipants] = useState<EventRegistration[]>([]);
+  const [participantsLoading, setParticipantsLoading] = useState(false);
+  const [participantsError, setParticipantsError] = useState<string | null>(null);
 
   // ---- Helpers ----
 
@@ -185,6 +198,46 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
     }
   };
 
+  const loadParticipantsForEvent = async (eventId: string) => {
+    try {
+      setParticipantsLoading(true);
+      setParticipantsError(null);
+
+      const regs = await apiFetch<EventRegistration[]>(
+        `/registrations/events/${eventId}/registrations`,
+      );
+
+      // consider only "registered" as active participants
+      const activeRegs = regs.filter((r) => r.status === "registered");
+
+      // update participants list
+      setParticipants(activeRegs);
+
+      // update count in events array
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === eventId ? { ...e, participants: activeRegs.length } : e,
+        ),
+      );
+
+      // update count for currently selected event
+      setSelectedEvent((prev) =>
+        prev && prev.id === eventId
+          ? { ...prev, participants: activeRegs.length }
+          : prev,
+      );
+    } catch (err: any) {
+      console.error(err);
+      setParticipantsError(
+        err?.message ||
+          "Nu s-au putut încărca participanții pentru acest eveniment.",
+      );
+      setParticipants([]);
+    } finally {
+      setParticipantsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadDashboard();
     loadCurrentUser();
@@ -214,7 +267,7 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
   const showParticipants = (event: Event) => {
     setSelectedEvent(event);
     setActiveTab("participanti");
-    // TODO: GET /registrations/events/{event.id}/registrations
+    loadParticipantsForEvent(event.id);
   };
 
   // Create event: POST /events
@@ -255,7 +308,7 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
         body: JSON.stringify({
           title: createForm.name,
           description: createForm.description || null,
-          start_at: startAtStr,      // <-- no toISOString(), stays local
+          start_at: startAtStr,
           end_at: endAtStr,
           location: createForm.location || null,
           category: createForm.category || null,
@@ -510,7 +563,7 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                                 onClick={() => showParticipants(event)}
                                 className="text-indigo-700 text-sm hover:underline"
                               >
-                                👥 {event.participants} participanți înregistrați
+                                👥 Participanți înregistrați
                               </button>
                             </div>
                           </div>
@@ -548,33 +601,67 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                   <div className="mb-6">
                     <h3 className="text-gray-800 mb-2">{selectedEvent.name}</h3>
                     <p className="text-gray-600">
-                      Total participanți: {selectedEvent.participants}
+                      Total participanți (înregistrări): {selectedEvent.participants}
                     </p>
                   </div>
-                  {/* încă dummy data până legi /registrations */}
-                  <div className="space-y-3">
-                    {Array.from({ length: selectedEvent.participants }, (_, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between py-3 border-b border-gray-100"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                            <User className="w-5 h-5 text-indigo-700" />
+
+                  {participantsLoading && (
+                    <p className="text-gray-600 text-sm text-center">
+                      Se încarcă participanții...
+                    </p>
+                  )}
+
+                  {participantsError && !participantsLoading && (
+                    <p className="text-red-600 text-sm text-center">
+                      {participantsError}
+                    </p>
+                  )}
+
+                  {!participantsLoading &&
+                    !participantsError &&
+                    participants.length === 0 && (
+                      <p className="text-gray-600 text-sm text-center">
+                        Nu există participanți înregistrați pentru acest eveniment.
+                      </p>
+                    )}
+
+                  {!participantsLoading &&
+                    !participantsError &&
+                    participants.length > 0 && (
+                      <div className="space-y-3">
+                        {participants.map((p, index) => (
+                          <div
+                            key={p.id}
+                            className="flex items-center justify-between py-3 border-b border-gray-100"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                                <User className="w-5 h-5 text-indigo-700" />
+                              </div>
+                              <div>
+                                <p className="text-gray-800">
+                                  Participant {index + 1}
+                                </p>
+                                <p className="text-gray-500 text-sm">
+                                  ID utilizator: {p.user_id}
+                                </p>
+                              </div>
+                            </div>
+                            <span
+                              className={`text-sm px-3 py-1 rounded ${
+                                p.status === "registered"
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-gray-100 text-gray-700"
+                              }`}
+                            >
+                              {p.status === "registered"
+                                ? "Confirmat"
+                                : p.status}
+                            </span>
                           </div>
-                          <div>
-                            <p className="text-gray-800">Student {i + 1}</p>
-                            <p className="text-gray-500 text-sm">
-                              student{i + 1}@usv.ro
-                            </p>
-                          </div>
-                        </div>
-                        <span className="text-green-700 text-sm bg-green-100 px-3 py-1 rounded">
-                          Confirmat
-                        </span>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    )}
                 </div>
               ) : (
                 <p className="text-gray-600 text-center">
@@ -873,7 +960,9 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                   type="text"
                   value={editForm.location}
                   onChange={(e) =>
-                    setEditForm((f) => (f ? { ...f, location: e.target.value } : f))
+                    setEditForm((f) =>
+                      f ? { ...f, location: e.target.value } : f,
+                    )
                   }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-indigo-700 outline-none"
                   placeholder="Ex: Sala A1"
