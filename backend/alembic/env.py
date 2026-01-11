@@ -1,7 +1,8 @@
-from logging.config import fileConfig
 import os
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from logging.config import fileConfig
+
+from sqlalchemy import engine_from_config, pool
+
 from alembic import context
 
 # this is the Alembic Config object, which provides
@@ -14,9 +15,10 @@ fileConfig(config.config_file_name)
 
 # add your model's MetaData object here
 import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from app.db.base import Base
 from app.core.config import settings
+from app.db.base import Base
 
 target_metadata = Base.metadata
 
@@ -24,6 +26,7 @@ target_metadata = Base.metadata
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
+
 
 def run_migrations_offline():
     url = str(settings.DATABASE.DATABASE_URL)
@@ -50,9 +53,7 @@ def run_migrations_online():
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

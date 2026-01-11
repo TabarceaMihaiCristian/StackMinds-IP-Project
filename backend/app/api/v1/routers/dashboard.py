@@ -1,34 +1,26 @@
-from typing import List, cast, Sequence
+from collections.abc import Sequence
 from datetime import datetime
+from typing import cast
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 from sqlalchemy.engine.row import Row
+from sqlalchemy.orm import Session
 
-from app.api.v1.dependencies import (
-    get_db,
-    require_role,
-)
-from app.models import User, Event
+from app.api.v1.dependencies import get_db, require_role
+from app.models import Event, User
 from app.repositories.dashboard import (
-    get_student_dashboard_data,
-    get_organizer_dashboard_data,
     get_admin_dashboard_data,
+    get_organizer_dashboard_data,
+    get_student_dashboard_data,
 )
-from app.schemas import (
-    DashboardEventSummary,
-    StudentDashboard,
-    OrganizerDashboard,
-    AdminDashboard,
-)
+from app.schemas import AdminDashboard, DashboardEventSummary, OrganizerDashboard, StudentDashboard
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
-def _rows_to_event_summaries(rows: Sequence[Event] | Sequence[Row]) -> List[DashboardEventSummary]:
+def _rows_to_event_summaries(rows: Sequence[Event] | Sequence[Row]) -> list[DashboardEventSummary]:
     summaries: list[DashboardEventSummary] = []
     for row in rows:
-        
         if isinstance(row, tuple):
             event: Event = row[0]
             category_name = row[1] if len(row) > 1 else None
@@ -38,7 +30,7 @@ def _rows_to_event_summaries(rows: Sequence[Event] | Sequence[Row]) -> List[Dash
             event = cast(Event, next(iter(row._mapping.values())))
             category_name = getattr(event, "category", None)
             location_name = getattr(event, "location", None)
-        
+
         else:
             event = row
             category_name = getattr(event, "category", None)
@@ -80,8 +72,8 @@ def get_organizer_dashboard(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("organizer")),
 ):
-    total_events, upcoming_events_count, total_regs, rows = (
-        get_organizer_dashboard_data(db, organizer_id=cast(str, current_user.id))
+    total_events, upcoming_events_count, total_regs, rows = get_organizer_dashboard_data(
+        db, organizer_id=cast(str, current_user.id)
     )
     events = _rows_to_event_summaries(rows)
     return OrganizerDashboard(

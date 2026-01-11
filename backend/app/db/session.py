@@ -9,7 +9,9 @@ if database_url.startswith("sqlite"):
     # sqlite needs this for using the same connection in different threads
     connect_args = {"check_same_thread": False}
 
-engine = create_engine(database_url, future=True, echo=settings.APP_ENV == "dev", connect_args=connect_args)
+engine = create_engine(
+    database_url, future=True, echo=settings.APP_ENV == "dev", connect_args=connect_args
+)
 
 SessionLocal = sessionmaker(
     autocommit=False,

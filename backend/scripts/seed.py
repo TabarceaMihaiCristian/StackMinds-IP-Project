@@ -1,7 +1,9 @@
 import uuid
+
+from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models import User
-from app.core.security import hash_password
+
 
 def create_user(db, name, email, password, role):
     user = db.query(User).filter(User.email == email).first()

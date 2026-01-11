@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -10,9 +9,9 @@ class DashboardEventSummary(BaseModel):
     start_at: datetime
     end_at: datetime
     status: str
-    category_name: Optional[str] = None
-    location_name: Optional[str] = None
-    organizer_name: Optional[str] = None
+    category_name: str | None = None
+    location_name: str | None = None
+    organizer_name: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -20,14 +19,14 @@ class DashboardEventSummary(BaseModel):
 class StudentDashboard(BaseModel):
     upcoming_events_count: int
     my_registrations_count: int
-    my_upcoming_events: List[DashboardEventSummary]
+    my_upcoming_events: list[DashboardEventSummary]
 
 
 class OrganizerDashboard(BaseModel):
     my_events_count: int
     my_upcoming_events_count: int
     total_registrations_for_my_events: int
-    upcoming_events: List[DashboardEventSummary]
+    upcoming_events: list[DashboardEventSummary]
 
 
 class AdminDashboard(BaseModel):
@@ -35,4 +34,4 @@ class AdminDashboard(BaseModel):
     total_events: int
     total_registrations: int
     upcoming_events_count: int
-    upcoming_events: List[DashboardEventSummary]
+    upcoming_events: list[DashboardEventSummary]

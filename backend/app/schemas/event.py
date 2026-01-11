@@ -1,45 +1,47 @@
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
 
 class EventBase(BaseModel):
     title: str
-    description: Optional[str] = None
+    description: str | None = None
     start_at: datetime
     end_at: datetime
-    location: Optional[str] = None
-    category: Optional[str] = None
-    max_participants: Optional[int] = None
+    location: str | None = None
+    category: str | None = None
+    max_participants: int | None = None
     status: str = "draft"
+
 
 class EventCreate(EventBase):
     pass
 
+
 class EventUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    start_at: Optional[datetime] = None
-    end_at: Optional[datetime] = None
-    location: Optional[str] = None
-    category: Optional[str] = None
-    max_participants: Optional[int] = None
-    status: Optional[str] = None
+    title: str | None = None
+    description: str | None = None
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    location: str | None = None
+    category: str | None = None
+    max_participants: int | None = None
+    status: str | None = None
+
 
 class EventRead(BaseModel):
     id: str
     organizer_id: str
-    organizer_name: Optional[str] = None
+    organizer_name: str | None = None
 
     title: str
-    description: Optional[str] = None
+    description: str | None = None
     start_at: datetime
     end_at: datetime
     status: str
-    
-    location: Optional[str] = None
-    category: Optional[str] = None
+
+    location: str | None = None
+    category: str | None = None
 
     created_at: datetime
     updated_at: datetime

@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class DatabaseSettings(BaseSettings):
     DATABASE_URL: str = "DATABASE_URL"
 
@@ -8,4 +9,3 @@ class DatabaseSettings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
-

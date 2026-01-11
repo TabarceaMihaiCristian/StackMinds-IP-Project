@@ -1,9 +1,6 @@
 from fastapi import APIRouter
-from app.api.v1.routers import auth
-from app.api.v1.routers import events
-from app.api.v1.routers import registrations
-from app.api.v1.routers import dashboard
-from app.api.v1.routers import users
+
+from app.api.v1.routers import auth, dashboard, events, registrations, users
 
 api_router = APIRouter()
 
