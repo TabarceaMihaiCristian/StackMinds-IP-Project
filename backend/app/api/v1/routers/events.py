@@ -18,6 +18,7 @@ def list_events(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
+    _ = current_user  # Unused but ensures authentication
     events = get_events(db, skip=skip, limit=limit, upcoming_only=upcoming_only)
     return events
 
@@ -28,6 +29,7 @@ def get_event_by_id(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
+    _ = current_user  # Unused but ensures authentication
     event = get_event(db, event_id=event_id)
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")

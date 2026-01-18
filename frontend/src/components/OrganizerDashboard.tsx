@@ -448,7 +448,7 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
       <div className="w-64 bg-indigo-700 text-white flex flex-col">
         <div className="px-6 py-4 border-b border-indigo-600">
           <h1>USV Events</h1>
-          <p className="text-indigo-200 text-sm mt-1">Organizer</p>
+          <p className="text-indigo-200 text-sm mt-1">Organizator</p>
         </div>
 
         <nav className="flex-1 px-4 py-6">

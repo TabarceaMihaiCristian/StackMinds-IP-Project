@@ -27,9 +27,9 @@ def create_user(db, name, email, password, role):
 def run():
     db = SessionLocal()
 
-    create_user(db, "Admin User", "admin1@example.com", "admin123", "admin")
-    create_user(db, "Organizer User", "organizer1@example.com", "org123", "organizer")
-    create_user(db, "Student User", "student1@example.com", "student123", "student")
+    create_user(db, "George Andrei", "george@example.com", "123", "admin")
+    create_user(db, "Maria Popescu", "maria@example.com", "123", "organizer")
+    create_user(db, "David Pop", "david@example.com", "123", "student")
 
     db.close()
 
