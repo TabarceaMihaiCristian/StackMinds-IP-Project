@@ -21,3 +21,14 @@ class RegistrationRead(BaseModel):
     checkin_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+class RegistrationReadWithUserName(BaseModel):
+    id: str
+    user_id: str
+    user_name: str
+    event_id: str
+    status: str
+    registered_at: datetime
+    checkin_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)

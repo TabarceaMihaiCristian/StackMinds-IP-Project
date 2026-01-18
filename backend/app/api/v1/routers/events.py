@@ -9,6 +9,7 @@ from app.schemas import EventCreate, EventRead, EventUpdate
 router = APIRouter(prefix="/events", tags=["events"])
 
 
+@router.get("", response_model=list[EventRead])
 @router.get("/", response_model=list[EventRead])
 def list_events(
     skip: int = 0,

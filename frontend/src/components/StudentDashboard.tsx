@@ -175,11 +175,9 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
       setEventsLoading(true);
       setEventsError(null);
 
-      const data = await apiFetch<ApiEvent[]>("/events?upcoming_only=true");
-      const published = data.filter((e) => e.status === "published");
-      const mapped = published.map(mapApiEventToUi);
+      const data = await apiFetch<ApiEvent[]>("/events/?upcoming_only=true");
+      setEvents(data.map(mapApiEventToUi));
 
-      setEvents(mapped);
     } catch (err: any) {
       console.error(err);
       setEventsError(

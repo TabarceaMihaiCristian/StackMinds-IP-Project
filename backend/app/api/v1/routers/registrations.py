@@ -12,7 +12,7 @@ from app.repositories import (
     get_registrations_for_user,
     get_registrations_for_user_and_event,
 )
-from app.schemas import RegistrationRead
+from app.schemas import RegistrationRead, RegistrationReadWithUserName
 
 router = APIRouter(prefix="/registrations", tags=["registrations"])
 
@@ -81,7 +81,7 @@ def list_my_registrations(
 
 @router.get(
     "/events/{event_id}/registrations",
-    response_model=list[RegistrationRead],
+    response_model=list[RegistrationReadWithUserName],
     status_code=status.HTTP_200_OK,
 )
 def list_registrations_for_event(
@@ -100,4 +100,15 @@ def list_registrations_for_event(
         )
 
     registrations = get_registrations_for_event(db, event_id)
-    return registrations
+    return [
+        {
+            "id": registration.id,
+            "user_id": registration.user_id,
+            "user_name": (registration.user.name if getattr(registration, "user", None) else ""),
+            "event_id": registration.event_id,
+            "status": registration.status,
+            "registered_at": registration.registered_at,
+            "checkin_at": registration.checkin_at,
+        }
+        for registration in registrations
+    ]

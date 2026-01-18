@@ -1,7 +1,7 @@
 from .auth import LoginRequest, Token, TokenData
 from .dashboard import AdminDashboard, DashboardEventSummary, OrganizerDashboard, StudentDashboard
 from .event import EventBase, EventCreate, EventRead, EventUpdate
-from .registration import RegistrationBase, RegistrationCreate, RegistrationRead
+from .registration import RegistrationBase, RegistrationCreate, RegistrationRead, RegistrationReadWithUserName
 from .user import UserBase, UserCreate, UserRead, UserUpdate
 
 __all__ = [
@@ -19,6 +19,7 @@ __all__ = [
     "RegistrationBase",
     "RegistrationCreate",
     "RegistrationRead",
+    "RegistrationReadWithUserName",
     "DashboardEventSummary",
     "StudentDashboard",
     "OrganizerDashboard",

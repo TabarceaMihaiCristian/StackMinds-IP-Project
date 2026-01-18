@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models import Event, Registration
 
@@ -20,7 +20,7 @@ def get_registrations_for_user_and_event(
 
 
 def count_event_registrations(db: Session, event_id: str) -> int:
-    stmt = select(func.count(Registration.id)).where(
+    stmt = select(func.count(Registration.id)).where( # pylint: disable=not-callable
         Registration.event_id == event_id, Registration.status == "registered"
     )
     return db.execute(stmt).scalar_one()
@@ -47,5 +47,8 @@ def get_registrations_for_user(db: Session, user_id: str) -> Sequence[Registrati
 
 
 def get_registrations_for_event(db: Session, event_id: str) -> Sequence[Registration]:
-    stmt = select(Registration).where(Registration.event_id == event_id)
+    stmt = (select(Registration)
+        .where(Registration.event_id == event_id)
+        .options(selectinload(Registration.user))
+    )
     return db.execute(stmt).scalars().all()

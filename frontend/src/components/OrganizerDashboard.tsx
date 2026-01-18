@@ -81,6 +81,7 @@ interface CurrentUser {
 interface EventRegistration {
   id: string;
   user_id: string;
+  user_name: string;
   event_id: string;
   status: string; // "registered" | "canceled" | ...
   created_at: string;
@@ -115,6 +116,7 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [originalEvent, setOriginalEvent] = useState<Event | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showPendingApprovalModal, setShowPendingApprovalModal] = useState(false);
 
   const [events, setEvents] = useState<Event[]>([]);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
@@ -328,6 +330,7 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
         description: "",
       });
       setShowCreateModal(false);
+      setShowPendingApprovalModal(true);
 
       await loadDashboard();
     } catch (err: any) {
@@ -643,7 +646,7 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                                   Participant {index + 1}
                                 </p>
                                 <p className="text-gray-500 text-sm">
-                                  ID utilizator: {p.user_id}
+                                  Nume: {p.user_name || "Nespecificat"}
                                 </p>
                               </div>
                             </div>
@@ -1041,6 +1044,26 @@ export function OrganizerDashboard({ onLogout }: OrganizerDashboardProps) {
                   {deleteSaving ? "Se șterge..." : "Șterge"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Approval Modal */}
+      {showPendingApprovalModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <h3 className="text-gray-800 mb-3">Eveniment creat</h3>
+              <p className="text-gray-600 mb-6">
+                Evenimentul a fost creat si este in asteptare pentru confirmarea unui administrator
+              </p>
+              <button
+                onClick={() => setShowPendingApprovalModal(false)}
+                className="w-full bg-indigo-700 text-white px-6 py-3 rounded-lg hover:bg-indigo-800 transition-colors"
+              >
+                Am inteles
+              </button>
             </div>
           </div>
         </div>
